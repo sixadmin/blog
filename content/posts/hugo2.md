@@ -1,6 +1,6 @@
 ---
 title: "Hugo: Déploiement continu"
-date: 2022-10-14T01:00:00+02:00
+date: 2022-10-15T01:00:00+02:00
 draft: false
 cover:
     image: img/hugo.png
@@ -53,7 +53,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Installing Homebrew
+      - name: Update theme
+        # (Optional)If you have the theme added as submodule, you can pull it and use the most updated version
+        run: git submodule update --init --recursive
+
+      - name: Installing Homebrew and Hugo
         run: |
           /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
           test -d ~/.linuxbrew && eval $(~/.linuxbrew/bin/brew shellenv)
@@ -61,14 +65,23 @@ jobs:
           echo "eval \$($(brew --prefix)/bin/brew shellenv)" >>~/.profile
           echo 'export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"' >>~/.bashrc
           echo 'export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"' >>~/.profile
+          echo "/home/linuxbrew/.linuxbrew/bin" >> $GITHUB_PATH
           source ~/.bashrc
           source ~/.profile
           brew --version
-      - name: Verify Homebrew's Installation
+          brew install hugo
+
+      - name: Build
+        run: hugo
+  
+      - name: Install SSH Key
         run: |
-          cat ~/.profile
-          echo "======================="
-          cat ~/.bashrc
-          echo "======================="
-          brew --version
+          install -m 600 -D /dev/null ~/.ssh/id_rsa
+          echo "${{ secrets.PRIVATE_SSH_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+
+      - name: Deploy
+        run: rsync --archive --delete --stats -e 'ssh -p 2227' 'public/' richard@${{ secrets.REMOTE_DEST }}:/var/www/html/blog
 ```
+
+## Explication du workflow

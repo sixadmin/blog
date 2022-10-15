@@ -1,6 +1,6 @@
 ---
 title: "Installation de docker et de docker-compose sous Debian 11 (Bullseye) / Debian 10 (Buster)"
-date: 2022-10-14T00:24:42+02:00
+date: 2022-10-13T00:24:42+02:00
 draft: false
 cover:
     image: img/docker.png
