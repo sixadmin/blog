@@ -26,7 +26,7 @@ jobs:
           echo "eval \$($(brew --prefix)/bin/brew shellenv)" >>~/.profile
           echo 'export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"' >>~/.bashrc
           echo 'export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"' >>~/.profile
-          echo "::add-path::/home/linuxbrew/.linuxbrew/bin"
+          echo "/home/linuxbrew/.linuxbrew/bin" >> $GITHUB_PATH
           source ~/.bashrc
           source ~/.profile
           brew --version
