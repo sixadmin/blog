@@ -74,6 +74,10 @@ On choisit l'option avec les sous-modules
 
 ```bash
 git submodule add --depth=1 https://github.com/adityatelange/hugo-PaperMod.git themes/PaperMod
+```
+Et si on reclone notre projet, il faut lancer la commande suivante
+
+```bash
 git submodule update --init --recursive # needed when you reclone your repo (submodules may not get cloned automatically)
 ```
 
