@@ -33,4 +33,13 @@ jobs:
           brew install hugo
 
       - name: Build
-        run: hugo
+        run: hugo --source website
+  
+      - name: Install SSH Key
+        run: |
+          install -m 600 -D /dev/null ~/.ssh/id_rsa
+          echo "${{ secrets.PRIVATE_SSH_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+
+      - name: Deploy
+        run: rsync --archive --delete --stats -e 'ssh -p 2227' 'website/public/' ${{ secrets.REMOTE_DEST }}
