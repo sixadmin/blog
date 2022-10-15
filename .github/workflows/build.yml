@@ -25,6 +25,4 @@ jobs:
           source ~/.bashrc
           source ~/.profile
           brew --version
-      - name: Installing Hugo
-        run: |
           brew install hugo
