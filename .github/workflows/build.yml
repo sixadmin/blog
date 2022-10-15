@@ -25,10 +25,6 @@ jobs:
           source ~/.bashrc
           source ~/.profile
           brew --version
-      - name: Verify Homebrew's Installation
+      - name: Installing Hugo
         run: |
-          cat ~/.profile
-          echo "======================="
-          cat ~/.bashrc
-          echo "======================="
-          brew --version
+          brew install hugo
