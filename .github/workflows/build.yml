@@ -14,7 +14,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Installing Homebrew
+      - name: Update theme
+        # (Optional)If you have the theme added as submodule, you can pull it and use the most updated version
+        run: git submodule update --init --recursive
+
+      - name: Installing Homebrew and Hugo
         run: |
           /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
           test -d ~/.linuxbrew && eval $(~/.linuxbrew/bin/brew shellenv)
@@ -26,3 +30,6 @@ jobs:
           source ~/.profile
           brew --version
           brew install hugo
+
+      - name: Build
+        run: hugo
