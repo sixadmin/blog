@@ -42,4 +42,4 @@ jobs:
           echo "${{ secrets.KNOWN_HOSTS }}" > ~/.ssh/known_hosts
 
       - name: Deploy
-        run: rsync --archive --delete --stats -e 'ssh -p 2227' 'public/' richard@${{ secrets.REMOTE_DEST }}:/home/richard/deploy
+        run: rsync --archive --delete --stats -e 'ssh -p 2227' 'public/' richard@${{ secrets.REMOTE_DEST }}:/var/www/html/blog
