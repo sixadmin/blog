@@ -226,3 +226,4 @@ oci_core_vcn.internal: Creation complete after 1s [id=ocid1.vcn.oc1.eu-paris-1.a
 
 Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
 ```
+![Oracle](/img/oraclenetwork.png)
