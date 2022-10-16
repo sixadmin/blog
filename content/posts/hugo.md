@@ -1,5 +1,6 @@
 ---
 title: "Hugo: Installation et configuration"
+summary: Voici la procédure pour installer localement et configurer le générateur de site statique HUGO.
 date: 2022-10-14T01:00:00+02:00
 draft: false
 cover:

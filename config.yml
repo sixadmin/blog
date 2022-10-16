@@ -3,8 +3,9 @@ languageCode: fr-fr
 title: Blog 6adm.in
 theme: PaperMod
 params:
+    env: production
     homeInfoParams:
-        Title: Bienvenue
+        Title: "Bienvenue \U0001F44D"
         Content: Ce site a pour vocation de me servir de pense-bête. J’espère qu’à vous aussi, il vous sera utile …
     socialIcons:
         - name: Github

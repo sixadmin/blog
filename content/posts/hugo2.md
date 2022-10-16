@@ -1,5 +1,6 @@
 ---
 title: "Hugo: Déploiement continu"
+summary: Maintenant que nous avons un site Hugo fonctionnant en local, voici la procédure pour le mettre en ligne automatiquement dès qu'on pousse une modification sur le repository du site.
 date: 2022-10-15T01:00:00+02:00
 draft: false
 cover:
