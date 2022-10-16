@@ -1,12 +1,12 @@
 baseURL: "https://blog.6adm.in"
 languageCode: fr-fr
-title: Blog 6adm.in
+title: "Blog"
 theme: PaperMod
 params:
     env: production
     homeInfoParams:
         Title: "Bienvenue \U0001F44D"
-        Content: Ce site a pour vocation de me servir de pense-bête. J’espère qu’à vous aussi, il vous sera utile …
+        Content: "La connaissance s'acquiert par l'expérience, tout le reste n'est que de l'information.\n\n**Albert Einstein**\n\nCe site a pour vocation de me servir de pense-bête. J’espère qu’à vous aussi, il vous sera utile …"
     socialIcons:
         - name: Github
           url: "https://github.com/sixadmin"
@@ -18,7 +18,11 @@ params:
           url: "https://www.linkedin.com/in/richard-cruz-7a978687/"
     ShowShareButtons: true
     ShowReadingTime: true
-    ShowCodeCopyButtons: true  
+    ShowCodeCopyButtons: true
+    label:
+      text: ""
+      icon: img/logo.png
+      iconHeight: 20
 
 menu:
   main:
