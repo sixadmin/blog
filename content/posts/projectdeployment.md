@@ -119,7 +119,7 @@ On rentre dans le dossier et on crée un fichier main.tf dans lequel nous allons
 terraform {
   required_providers {
     oci = {
-      source = "hashicorp/oci"
+      source = "oracle/oci"
     }
   }
 }
@@ -139,27 +139,25 @@ resource "oci_core_vcn" "internal" {
 ```
 Avec region qui correspond à la région que vous avez choisi à la création de votre cloud, config_file_profile est évidemment le nom du profile que nous avons choisi précedement et compartment_id est disponible en cliquant sur l'icone du profile en haut à droite de la console OCI et en sélectionnant Location:VotreUsername
 
+Pour mettre en place notre infrastrcture, on lance la commande terraform init qui va installer les plugins dont nous avons besoin.
+
 ```bash
 terraform init
 
 Initializing the backend...
 
 Initializing provider plugins...
-- Finding latest version of hashicorp/oci...
-- Installing hashicorp/oci v4.96.0...
-- Installed hashicorp/oci v4.96.0 (signed by HashiCorp)
+- Finding latest version of oracle/oci...
+- Installing oracle/oci v4.96.0...
+- Installed oracle/oci v4.96.0 (signed by a HashiCorp partner, key ID 1533A49284137CEB)
 
-Terraform has created a lock file .terraform.lock.hcl to record the provider
-selections it made above. Include this file in your version control repository
-so that Terraform can guarantee to make the same selections by default when
-you run "terraform init" in the future.
+Partner and community providers are signed by their developers.
+If you'd like to know more about provider signing, you can read about it here:
+https://www.terraform.io/docs/cli/plugins/signing.html
 
-╷
-│ Warning: Additional provider information from registry
-│ 
-│ The remote registry returned warnings for registry.terraform.io/hashicorp/oci:
-│ - For users on Terraform 0.13 or greater, this provider has moved to oracle/oci. Please update your source in required_providers.
-╵
+Terraform has made some changes to the provider dependency selections recorded
+in the .terraform.lock.hcl file. Review those changes and commit them to your
+version control system if they represent changes you intended to make.
 
 Terraform has been successfully initialized!
 
@@ -172,10 +170,14 @@ rerun this command to reinitialize your working directory. If you forget, other
 commands will detect it and remind you to do so if necessary.
 ```
 
+On peut vérifier notre configuration
+
 ```bash
 terraform validate
 Success! The configuration is valid.
 ```
+
+Et enfin, on applique notre configuration
 
 ```bash
 richard@S30:~/Documents/deployinfra$ terraform apply
@@ -190,7 +192,7 @@ Terraform will perform the following actions:
       + byoipv6cidr_blocks               = (known after apply)
       + cidr_block                       = "172.16.0.0/20"
       + cidr_blocks                      = (known after apply)
-      + compartment_id                   = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3moz6nw2o6d74a6xxlft7yjsjav47jx4l4ic2fc2b4qya"
+      + compartment_id                   = "ocid1.tenancy.oc1..aaaaaaaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
       + default_dhcp_options_id          = (known after apply)
       + default_route_table_id           = (known after apply)
       + default_security_list_id         = (known after apply)
@@ -222,8 +224,39 @@ Do you want to perform these actions?
   Enter a value: yes
 
 oci_core_vcn.internal: Creating...
-oci_core_vcn.internal: Creation complete after 1s [id=ocid1.vcn.oc1.eu-paris-1.amaaaaaa5nytwhqaayum25cq3ohfal22i47hggrxzvpemqfaq5sb66fmzpvq]
+oci_core_vcn.internal: Creation complete after 1s [id=ocid1.vcn.oc1.eu-paris-1.amaaaaaa5nytwhqaaxxxxxxxxxxxxggrxzvpemqfaq5sb66fmzpvq]
 
 Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
 ```
+Et si on se rend sur la console OCI, on constate la création de notre réseau cloud virtuel.
+
 ![Oracle](/img/oraclenetwork.png)
+
+Quand vous lancez la commande terraform apply, Terraform écrit les données dans un fichier intitulé terraform.tfstate.
+
+Le fichier terraform.tfstate est le seul moyen pour Terraform de suivre les ressources qu'il gère et contient souvent des informations sensibles. Vous devez donc stocker votre fichier d'état en toute sécurité et le distribuer uniquement aux membres de l'équipe de confiance qui doivent gérer votre infrastructure.
+
+On peut inspecter l'état courant avec la commande
+
+```bash
+terraform show
+```
+
+On peut aussi afficher les ressources utilisées dans notre projet avec la commande
+
+```bash
+terraform state list
+```
+
+Ce qui donne dans notre cas:
+
+```bash
+terraform state list
+oci_core_vcn.internal
+```
+Pour supprimer les ressources du projet, on va utiliser la commande:
+
+```bash
+terraform destroy
+```
+
