@@ -3,7 +3,7 @@ title: "Hugo: Déploiement continu"
 date: 2022-10-15T01:00:00+02:00
 draft: false
 cover:
-    image: img/hugo.png
+    image: img/hugo2.png
     alt: "hugo" # alt text
 tags: ["hugo", "CI/CD", "DevOps"]  
 ShowToc: true
