@@ -279,6 +279,10 @@ hugo
 
 Il crée un dossier public qui contient notre site.
 
+> **Attention**
+> Si vous mettez en ligne votre site, les images risquent de ne pas s'afficher sur les posts. Il est indispensable d'éditer le fichier config.yml et de renseigner l'URL de votre site, ex: baseURL: "https://blog.6adm.in"
+
+
 Ce tutoriel est la traduction de l'excellent tuto de la chaine [Envato Tuts+](https://www.youtube.com/c/tutsplus)
 
 {{< youtube hjD9jTi_DQ4 >}}
