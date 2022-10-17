@@ -1,5 +1,6 @@
 baseURL: "https://blog.6adm.in"
 languageCode: fr-fr
+DefaultContentLanguage: fr
 title: "Blog"
 theme: PaperMod
 params:

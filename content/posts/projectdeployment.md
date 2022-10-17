@@ -259,4 +259,18 @@ Pour supprimer les ressources du projet, on va utiliser la commande:
 ```bash
 terraform destroy
 ```
+### Création de nos 4 instances
 
+On repart de 0.
+
+On va créer un premier fichier providers.tf avec le contenu suivant:
+
+```tf
+terraform {
+  required_providers {
+    oci = {
+      source = "oracle/oci"
+    }
+  }
+}
+```
