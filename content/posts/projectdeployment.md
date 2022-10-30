@@ -263,14 +263,135 @@ terraform destroy
 
 On repart de 0.
 
-On va créer un premier fichier providers.tf avec le contenu suivant:
+#### Création de clés RSA
 
-```tf
-terraform {
-  required_providers {
-    oci = {
-      source = "oracle/oci"
-    }
-  }
+Nous allons maintenant créer des clés RSA pour se connecter via l'API à notre compte OCI.
+
+Nous allons créer un dossier .oci dans notre home directory.
+
+```bash
+mkdir $HOME/.oci
+```
+
+Nous générons une clé privée de 2048 bit au format PEM.
+
+```bash
+openssl genrsa -out $HOME/.oci/<your-rsa-key-name>.pem 2048
+```
+
+On change les permissions afin que ce soit uniquement vous qui puisse lire et ecrire la clé privée
+
+```bash
+chmod 600 $HOME/.oci/<your-rsa-key-name>.pem
+```
+
+On génère la clé publique.
+
+```bash
+openssl rsa -pubout -in $HOME/.oci/<your-rsa-key-name>.pem -out $HOME/.oci/<your-rsa-key-name>_public.pem
+```
+
+On va copier le contenu de notre clé publique et l'ajouter à notre compte Oracle. Pour cela, on se connecte à son compte, on clique sur notre avatar en haut à droite et on va sur "Mon profil".
+
+![oci](/img/oci1.png)
+
+On a un menu en bas à gauche dans lequel nous avons une rubrique "Clés d'API".
+
+![oci](/img/oci2.png)
+
+On clique dessus et dans la nouvelle fenêtre, on clique sur "Ajouter une clé API". Dans la nouvelle fenêtre, on clique sur "Coller une clé publique" et on copie colle le contenu de notre clé en gardant les lignes BEGIN PUBLIC KEY et END PUBLIC KEY.
+
+![oci](/img/oci3.png)
+
+On clique sur ajouter.
+
+![oci](/img/oci4.png)
+
+Il nous indique comment configurer le fichier config du dossier .oci qui se trouve dans notre home directory.
+
+On peut dès lors se connecter à notre compte via les clés RSA.
+
+#### Création des droits utilisateurs
+
+On clique sur notre avatar et ensuite "Domaine d'identité: default"
+
+On va créer un utilisateur
+
+![oci](/img/oci5.png)
+
+Puis un groupe
+
+![oci](/img/oci6.png)
+
+On coche la case relative à l'utilisateur que nous venons de créer
+
+![oci](/img/oci7.png)
+
+On clique sur Créer
+
+![oci](/img/oci8.png)
+
+On clique de nouveau sur notre avatar puis "Domaine d'identité: default"
+
+![oci](/img/oci9.png)
+
+Dans le fil d'arianne, on clique sur Domaines
+
+![oci](/img/oci10.png)
+
+Puis Stratégies
+
+![oci](/img/oci11.png)
+
+On clique sur créer une stratégie et on renseigne un nom, une description, le compartiment. On clique sur Afficher l'éditeur manuel et on y colle la strétégie suivante
+
+```
+allow group <le-groupe-auquel-appartient-votre-utilisateur> to read all-resources in tenancy
+
+```
+
+![oci](/img/oci12.png)
+
+Et on fait Créer
+
+![oci](/img/oci13.png)
+
+
+
+#### Liste des informations requises
+
+Pour utiliser Terraform sur notre infrastructure Cloud Oracle, nous devons recueillir certaines informations disponibles depuis la console Oracle Cloud Infrastructure.
+
+- tenancy_ocid: On retrouve cette information à partir de notre avatar, on va sur Location : \<your-tenancy> et on copie l'OCID.
+- user_ocid: On retrouve cette information en cliquant sur l'utilisateur que nous venons de créer
+
+![oci](/img/oci14.png)
+
+- private_key_path: chemin d'accès à la clé privée RSA que vous avez créée plus haut. Exemple : $HOME/.oci/\<your-rsa-key-name>.pem.
+- fingerprint : On retrouve cette information à partir de notre avatar, on va sur "Mon profil", on clique sur clés d'API et on copie l'empreinte associée à la clé publique RSA que vous avez créée plus haut. Le format est : xx:xx:xx…xx.
+- region : Vous trouverez votre région dans la bannière supérieure de la console Oracle. Si vous cliquez dessus, il vous donnera le terme exact relatif à votre région, ex: eu-paris-1
+
+#### Création des fichiers terraform.
+
+Nous allons créer trois fichiers pour 
+- L'authentification
+- Récuperer les données de notre compte
+- imprimer les outputs
+
+##### Ajout de l'authentification
+
+On va créer un dossier qui va contenir nos fichiers terraform.
+
+On y crée un fichier nommé provider.tf comme ci-dessous en remplacant les données entre crochets par les valeurs récuperées ci-dessus tout en gardant les guillemets.
+
+```
+provider "oci" {
+  tenancy_ocid = "<tenancy-ocid>"
+  user_ocid = "<user-ocid>" 
+  private_key_path = "<rsa-private-key-path>"
+  fingerprint = "<fingerprint>"
+  region = "<region-identifier>"
 }
 ```
+
+
