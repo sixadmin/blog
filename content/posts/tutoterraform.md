@@ -4,7 +4,7 @@ summary: Dans cette article, vous trouverez une présentation global de terrafor
 date: 2022-10-23T01:00:00+02:00
 draft: false
 cover:
-    image: img/terraform.png
+    image: img/terraform2.png
     alt: "terraform" # alt text
 tags: ["devops", "terraform", "cloud"]  
 ShowToc: true

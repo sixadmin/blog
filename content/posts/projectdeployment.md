@@ -311,59 +311,13 @@ Il nous indique comment configurer le fichier config du dossier .oci qui se trou
 
 On peut dès lors se connecter à notre compte via les clés RSA.
 
-#### Création des droits utilisateurs
-
-On clique sur notre avatar et ensuite "Domaine d'identité: default"
-
-On va créer un utilisateur
-
-![oci](/img/oci5.png)
-
-Puis un groupe
-
-![oci](/img/oci6.png)
-
-On coche la case relative à l'utilisateur que nous venons de créer
-
-![oci](/img/oci7.png)
-
-On clique sur Créer
-
-![oci](/img/oci8.png)
-
-On clique de nouveau sur notre avatar puis "Domaine d'identité: default"
-
-![oci](/img/oci9.png)
-
-Dans le fil d'arianne, on clique sur Domaines
-
-![oci](/img/oci10.png)
-
-Puis Stratégies
-
-![oci](/img/oci11.png)
-
-On clique sur créer une stratégie et on renseigne un nom, une description, le compartiment. On clique sur Afficher l'éditeur manuel et on y colle la strétégie suivante
-
-```
-allow group <le-groupe-auquel-appartient-votre-utilisateur> to read all-resources in tenancy
-
-```
-
-![oci](/img/oci12.png)
-
-Et on fait Créer
-
-![oci](/img/oci13.png)
-
-
 
 #### Liste des informations requises
 
 Pour utiliser Terraform sur notre infrastructure Cloud Oracle, nous devons recueillir certaines informations disponibles depuis la console Oracle Cloud Infrastructure.
 
 - tenancy_ocid: On retrouve cette information à partir de notre avatar, on va sur Location : \<your-tenancy> et on copie l'OCID.
-- user_ocid: On retrouve cette information en cliquant sur l'utilisateur que nous venons de créer
+- user_ocid: On retrouve cette information en cliquant sur notre utilisateur.
 
 ![oci](/img/oci14.png)
 
@@ -371,14 +325,14 @@ Pour utiliser Terraform sur notre infrastructure Cloud Oracle, nous devons recue
 - fingerprint : On retrouve cette information à partir de notre avatar, on va sur "Mon profil", on clique sur clés d'API et on copie l'empreinte associée à la clé publique RSA que vous avez créée plus haut. Le format est : xx:xx:xx…xx.
 - region : Vous trouverez votre région dans la bannière supérieure de la console Oracle. Si vous cliquez dessus, il vous donnera le terme exact relatif à votre région, ex: eu-paris-1
 
-#### Création des fichiers terraform.
+#### Authentification
 
 Nous allons créer trois fichiers pour 
 - L'authentification
 - Récuperer les données de notre compte
 - imprimer les outputs
 
-##### Ajout de l'authentification
+##### Création des fichiers
 
 On va créer un dossier qui va contenir nos fichiers terraform.
 
@@ -393,5 +347,67 @@ provider "oci" {
   region = "<region-identifier>"
 }
 ```
+
+##### Test
+
+Afin de tester notre authentification, nous allons afficher les domaines disponibles dans notre tenant: [oci_identity_availability_domains](https://registry.terraform.io/providers/oracle/oci/latest/docs/data-sources/identity_availability_domains)
+
+Nous créons donc un fichier domaine-dispo.tf avec le contenu suivant
+
+```
+data "oci_identity_availability_domains" "ads" {
+compartment_id = "ocid1.tenancy.oc1..aaaaaaaauxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxc2fc2b4qya"
+}
+```
+
+Et on crée un fichier outputs.tf avec le contenu suivant:
+
+```
+output "show-ads" {
+  value = "${data.oci_identity_availability_domains.ads.availability_domains}"
+}
+```
+
+Ce qui donne:
+
+```bash
+ terraform apply
+data.oci_identity_availability_domains.ads: Reading...
+data.oci_identity_availability_domains.ads: Read complete after 2s [id=IdentityAvailabilityDomainsDataSource-367745787]
+
+Changes to Outputs:
+  + show-ads = [
+      + {
+          + compartment_id = "ocid1.tenancy.oc1...aaaaaaaauxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxc2fc2b4qya"
+          + id             = "ocid1.availabilitydomain.oc1..aaaaaaaaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx7weba4e5ga"
+          + name           = "Tgrg:EU-PARIS-1-AD-1"
+        },
+    ]
+
+You can apply this plan to save these new output values to the Terraform state, without changing any real infrastructure.
+
+Do you want to perform these actions?
+  Terraform will perform the actions described above.
+  Only 'yes' will be accepted to approve.
+
+  Enter a value: yes
+
+
+Apply complete! Resources: 0 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+show-ads = tolist([
+  {
+    "compartment_id" = "ocid1.tenancy.oc1...aaaaaaaauxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxc2fc2b4qya"
+    "id" = "ocid1.availabilitydomain.oc1..aaaaaaaaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx7weba4e5ga"
+    "name" = "Tgrg:EU-PARIS-1-AD-1"
+  },
+])
+```
+
+Dans le cas présent, nous avons un seul domaine mais surtout nous constatons que notre authentification fonctionne.
+
+
 
 
