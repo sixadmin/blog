@@ -408,6 +408,17 @@ show-ads = tolist([
 
 Dans le cas présent, nous avons un seul domaine mais surtout nous constatons que notre authentification fonctionne.
 
+### Création d'une instance
+#### Création manuelle d'une instance.
 
+Dans cette partie, nous allons déployer une instance composée d'une image ubuntu 22.04 sur une VM standard A1 FLex.
 
+![oci](/img/oci15.png)
 
+![oci](/img/oci16.png)
+
+![oci](/img/oci17.png)
+
+![oci](/img/oci19.png)
+
+![oci](/img/oci20.png)
