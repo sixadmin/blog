@@ -259,7 +259,7 @@ Pour supprimer les ressources du projet, on va utiliser la commande:
 ```bash
 terraform destroy
 ```
-### Création de nos 4 instances
+### Premiers tests
 
 On repart de 0.
 
