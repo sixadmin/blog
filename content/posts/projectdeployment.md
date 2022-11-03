@@ -417,7 +417,11 @@ Dans cette partie, nous allons déployer une instance composée d'une image ubun
 
 ![oci](/img/oci16.png)
 
+Dans la partie réseau, nous avons une adresse ip privée et une adresse ip publique grâce à laquelle nous allons pouvoir nous y connecter en ssh et aussi exposer un site web.
+
 ![oci](/img/oci17.png)
+
+Ensuite, nous avons la possibilité d'uploader notre clé publique ssh pour se connecter directement à notre VM en ssh.
 
 ![oci](/img/oci19.png)
 
