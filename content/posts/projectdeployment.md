@@ -425,4 +425,189 @@ Ensuite, nous avons la possibilité d'uploader notre clé publique ssh pour se c
 
 ![oci](/img/oci19.png)
 
+On a aussi une rubrique concernant le boot volume.
+
 ![oci](/img/oci20.png)
+
+Enfin, on a une rubrique qui nous propose la mise en place d'un script d'initialisation.
+
+![oci](/img/oci20b.png)
+
+Quand c'est fini et que nous faisons create, nous disposons d'une machine à laquelle nous pouvons nous connecter en ssh après avoir récuperé l'IP publique dans la console d'administration.
+
+Nous allons donc nous connecter pour y installer un serveur web grâce aux commandes suivantes:
+
+```bash
+sudo apt-get update
+sudo apt-get install apache2
+```
+
+Par contre, si nous lancons un navigateur et tentons de renseigner l'adresse IP publique de notre serveur, cela ne fonctionne pas. Il faut autoriser le port 80 dans notre console d'administration Oracle.
+
+Pour cela, on se rend sur Networking puis Virtual Cloud Networks. On clique sur notre VCN
+
+![oci](/img/oci21.png)
+
+Puis notre subnet
+
+![oci](/img/oci22.png)
+
+Et enfin sur notre security list
+
+![oci](/img/oci23.png)
+
+On arrive sur les Ingress Rule, on clique sur Add Ingress Rule
+
+![oci](/img/oci24.png)
+
+Et dans la nouvelle fenêtre, on autorise la connexion sur le port 80 comme suit:
+
+![oci](/img/oci25.png)
+
+On refait un test de connexion à notre serveur web mais ca ne fonctionne toujours pas.
+
+Nous devons aussi autoriser la connexion sur notre serveur au niveau iptables. On se connecte donc sur notre machine et on lance les commandes suivantes:
+
+```bash
+sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
+sudo netfilter-persistent save
+```
+Si nous essayons de nouveau d'accéder à notre serveur web, cela fonctionne:
+
+![oci](/img/oci26.png)
+
+Maintenant que nous connaissons les étapes pour créer un serveur web basé sur ubuntu fonctionnant sur une machine ARM, nous allons pouvoir créer des fichiers terraform pour arriver au même résultat.
+
+#### Création d'une instance hébergeant un serveur web via terraform.
+
+Au vu de l'étape précedente, nous savons de quoi nous avons besoin pour créer notre machine via terraform.
+
+Commencons par créer un [VCN](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/core_vcn)
+
+```
+resource "oci_core_vcn" "vcn" {
+  cidr_block = "10.1.0.0/16"
+  compartment_id = var.compartment_ocid
+  display_name = "vcn-${var.hostname}"
+  dns_label = "vcn${var.hostname}"
+}
+```
+
+On stockera les variables dans le fichier variables.tf
+
+```
+variable "compartment_ocid" {
+  # OCID of your OCI Account compartment
+  default = "xxxxxx"
+}
+
+variable "hostname" {
+  default = "xxxxxx"
+}
+```
+
+Voici ce que nous avons actuellement suite à la création via l'interface
+
+![oci](/img/oci27.png)
+
+Paramtétrage des accés sortants
+
+Nous avons besoin d'une passerelle internet et d'une table de routage pour les accès externes.
+
+```
+resource "oci_core_internet_gateway" "internet_gateway" {
+  compartment_id = var.compartment_ocid
+  display_name = "ig-${var.hostname}"
+  vcn_id = oci_core_vcn.vcn.id
+}
+```
+
+```
+resource "oci_core_default_route_table" "default_route_table" {
+  manage_default_resource_id = oci_core_vcn.vcn.default_route_table_id
+  display_name = "rt-${var.hostname}"
+
+  route_rules {
+    destination = "0.0.0.0/0"
+    destination_type = "CIDR_BLOCK"
+    network_entity_id = oci_core_internet_gateway.internet_gateway.id
+  }
+}
+```
+Nous allons autoriser tous les accès sortants
+
+```
+resource "oci_core_network_security_group_security_rule" "nsg_outbound" {
+  network_security_group_id = "${oci_core_network_security_group.nsg.id}"
+  direction = "EGRESS"
+  protocol = "all"
+  description = "nsg-${var.hostname}-outbound"
+  destination = "0.0.0.0/0"
+  destination_type = "CIDR_BLOCK"
+}
+```
+
+Poursuivons en créant un sous-réseau.
+
+```
+resource "oci_core_subnet" "subnet" {
+  availability_domain = data.oci_identity_availability_domain.ad.name
+  cidr_block = "10.1.0.0/24"
+  display_name = "subnet-${var.hostname}"
+  dns_label = "subnet${var.hostname}"
+  security_list_ids = [
+    oci_core_security_list.empty_security_list.id]
+  compartment_id = var.compartment_ocid
+  vcn_id = oci_core_vcn.vcn.id
+  route_table_id = oci_core_vcn.vcn.default_route_table_id
+  dhcp_options_id = oci_core_vcn.vcn.default_dhcp_options_id
+}
+```
+
+ Et une security list qui sera vide par défaut.
+
+```
+# create empty security list to avoid using 'default' with open 22
+resource "oci_core_security_list" "empty_security_list" {
+  compartment_id = var.compartment_ocid
+  vcn_id = oci_core_vcn.vcn.id
+  display_name = "seclist-${var.hostname}"
+}
+```
+
+Les accès entrant
+
+Ensuite, nous créons un Network Security Group.
+
+```
+resource "oci_core_network_security_group" "nsg" {
+  compartment_id = var.compartment_ocid
+  vcn_id = oci_core_vcn.vcn.id
+  display_name = "nsg-${var.hostname}"
+}
+```
+
+On autorise le ssh
+
+```
+resource "oci_core_network_security_group_security_rule" "nsg_inbound_ssh" {
+  network_security_group_id = "${oci_core_network_security_group.nsg.id}"
+  direction = "INGRESS"
+  protocol = "6" # TCP
+  description = "nsg-${var.hostname}-inbound-ssh"
+  source = "${data.dns_a_record_set.bastion-host.addrs[0]}/32"
+  source_type = "CIDR_BLOCK"
+  destination = "${module.vminst.public_ip}/32"
+  destination_type = "CIDR_BLOCK"
+  tcp_options {
+    destination_port_range {
+      min = 22
+      max = 22
+    }
+  }
+}
+```
+
+<!---
+https://www.lightenna.com/tech/2020/create-oracle-cloud-vm-using-terraform/
+-->
