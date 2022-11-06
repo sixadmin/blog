@@ -510,6 +510,61 @@ Voici ce que nous avons actuellement suite à la création via l'interface
 
 ![oci](/img/oci27.png)
 
+Et voici le résultat de la commande
+
+```bash
+terraform apply
+
+Terraform used the selected providers to generate the following execution plan. Resource actions are indicated with the following symbols:
+  + create
+
+Terraform will perform the following actions:
+
+  # oci_core_vcn.vcn will be created
+  + resource "oci_core_vcn" "vcn" {
+      + byoipv6cidr_blocks               = (known after apply)
+      + cidr_block                       = "10.1.0.0/16"
+      + cidr_blocks                      = (known after apply)
+      + compartment_id                   = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3mozxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx4qya"
+      + default_dhcp_options_id          = (known after apply)
+      + default_route_table_id           = (known after apply)
+      + default_security_list_id         = (known after apply)
+      + defined_tags                     = (known after apply)
+      + display_name                     = "vcn-kube"
+      + dns_label                        = "vcnkube"
+      + freeform_tags                    = (known after apply)
+      + id                               = (known after apply)
+      + ipv6cidr_blocks                  = (known after apply)
+      + ipv6private_cidr_blocks          = (known after apply)
+      + is_ipv6enabled                   = (known after apply)
+      + is_oracle_gua_allocation_enabled = (known after apply)
+      + state                            = (known after apply)
+      + time_created                     = (known after apply)
+      + vcn_domain_name                  = (known after apply)
+
+      + byoipv6cidr_details {
+          + byoipv6range_id = (known after apply)
+          + ipv6cidr_block  = (known after apply)
+        }
+    }
+
+Plan: 1 to add, 0 to change, 0 to destroy.
+
+Do you want to perform these actions?
+  Terraform will perform the actions described above.
+  Only 'yes' will be accepted to approve.
+
+  Enter a value: yes
+
+oci_core_vcn.vcn: Creating...
+oci_core_vcn.vcn: Creation complete after 2s [id=ocid1.vcn.oc1.eu-paris-1.amaaaaaa5nytwhqa62exmbafamzgcdqhf6uuoqogygcdatdttxnm6azufidq]
+
+Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+```
+Ce qui nous donne au niveau de l'interface
+
+![oci](/img/oci28.png)
+
 Paramtétrage des accés sortants
 
 Nous avons besoin d'une passerelle internet et d'une table de routage pour les accès externes.
@@ -534,6 +589,17 @@ resource "oci_core_default_route_table" "default_route_table" {
   }
 }
 ```
+
+Ensuite, nous créons un Network Security Group.
+
+```
+resource "oci_core_network_security_group" "nsg" {
+  compartment_id = var.compartment_ocid
+  vcn_id = oci_core_vcn.vcn.id
+  display_name = "nsg-${var.hostname}"
+}
+```
+
 Nous allons autoriser tous les accès sortants
 
 ```
@@ -546,6 +612,90 @@ resource "oci_core_network_security_group_security_rule" "nsg_outbound" {
   destination_type = "CIDR_BLOCK"
 }
 ```
+
+Si nous faisons un terraform plan à ce stade, il nous dit:
+
+```
+$ terraform plan
+oci_core_vcn.vcn: Refreshing state... [id=ocid1.vcn.oc1.eu-paris-1.amaaaaaa5nytwhqa62exmbafamzgcdqhf6uuoqogygcdatdttxnm6azufidq]
+
+Terraform used the selected providers to generate the following execution plan. Resource actions are indicated with the following symbols:
+  + create
+
+Terraform will perform the following actions:
+
+  # oci_core_default_route_table.default_route_table will be created
+  + resource "oci_core_default_route_table" "default_route_table" {
+      + compartment_id             = (known after apply)
+      + defined_tags               = (known after apply)
+      + display_name               = "rt-kube"
+      + freeform_tags              = (known after apply)
+      + id                         = (known after apply)
+      + manage_default_resource_id = "ocid1.routetable.oc1.eu-paris-1.aaaaaaaatk4wewk3gfz2voan577y2sl7a46jf5v7y4f7gwqfxrhcshnqdyma"
+      + state                      = (known after apply)
+      + time_created               = (known after apply)
+
+      + route_rules {
+          + cidr_block        = (known after apply)
+          + description       = (known after apply)
+          + destination       = "0.0.0.0/0"
+          + destination_type  = "CIDR_BLOCK"
+          + network_entity_id = (known after apply)
+          + route_type        = (known after apply)
+        }
+    }
+
+  # oci_core_internet_gateway.internet_gateway will be created
+  + resource "oci_core_internet_gateway" "internet_gateway" {
+      + compartment_id = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3moz6nw2o6d74a6xxlft7yjsjav47jx4l4ic2fc2b4qya"
+      + defined_tags   = (known after apply)
+      + display_name   = "ig-kube"
+      + enabled        = true
+      + freeform_tags  = (known after apply)
+      + id             = (known after apply)
+      + route_table_id = (known after apply)
+      + state          = (known after apply)
+      + time_created   = (known after apply)
+      + vcn_id         = "ocid1.vcn.oc1.eu-paris-1.amaaaaaa5nytwhqa62exmbafamzgcdqhf6uuoqogygcdatdttxnm6azufidq"
+    }
+
+  # oci_core_network_security_group.nsg will be created
+  + resource "oci_core_network_security_group" "nsg" {
+      + compartment_id = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3moz6nw2o6d74a6xxlft7yjsjav47jx4l4ic2fc2b4qya"
+      + defined_tags   = (known after apply)
+      + display_name   = "nsg-kube"
+      + freeform_tags  = (known after apply)
+      + id             = (known after apply)
+      + state          = (known after apply)
+      + time_created   = (known after apply)
+      + vcn_id         = "ocid1.vcn.oc1.eu-paris-1.amaaaaaa5nytwhqa62exmbafamzgcdqhf6uuoqogygcdatdttxnm6azufidq"
+    }
+
+  # oci_core_network_security_group_security_rule.nsg_outbound will be created
+  + resource "oci_core_network_security_group_security_rule" "nsg_outbound" {
+      + description               = "nsg-kube-outbound"
+      + destination               = "0.0.0.0/0"
+      + destination_type          = "CIDR_BLOCK"
+      + direction                 = "EGRESS"
+      + id                        = (known after apply)
+      + is_valid                  = (known after apply)
+      + network_security_group_id = (known after apply)
+      + protocol                  = "all"
+      + source_type               = (known after apply)
+      + stateless                 = (known after apply)
+      + time_created              = (known after apply)
+    }
+
+Plan: 4 to add, 0 to change, 0 to destroy.
+```
+
+On retrouve nos infos dans l'interface
+
+![oci](/img/oci30.png)
+
+![oci](/img/oci31.png)
+
+![oci](/img/oci32.png)
 
 Poursuivons en créant un sous-réseau.
 
@@ -575,17 +725,8 @@ resource "oci_core_security_list" "empty_security_list" {
 }
 ```
 
-Les accès entrant
+Nous configurons ensuite les accès entrants
 
-Ensuite, nous créons un Network Security Group.
-
-```
-resource "oci_core_network_security_group" "nsg" {
-  compartment_id = var.compartment_ocid
-  vcn_id = oci_core_vcn.vcn.id
-  display_name = "nsg-${var.hostname}"
-}
-```
 
 On autorise le ssh
 
@@ -603,6 +744,27 @@ resource "oci_core_network_security_group_security_rule" "nsg_inbound_ssh" {
     destination_port_range {
       min = 22
       max = 22
+    }
+  }
+}
+```
+
+et le http
+
+```
+resource "oci_core_network_security_group_security_rule" "nsg_inbound_http" {
+  network_security_group_id = "${oci_core_network_security_group.nsg.id}"
+  direction = "INGRESS"
+  protocol = "6" # TCP
+  description = "nsg-${var.hostname}-inbound-http"
+  source = "${data.dns_a_record_set.bastion-host.addrs[0]}/32"
+  source_type = "CIDR_BLOCK"
+  destination = "${module.vminst.public_ip}/32"
+  destination_type = "CIDR_BLOCK"
+  tcp_options {
+    destination_port_range {
+      min = 80
+      max = 80
     }
   }
 }
