@@ -409,7 +409,7 @@ show-ads = tolist([
 Dans le cas présent, nous avons un seul domaine mais surtout nous constatons que notre authentification fonctionne.
 
 ### Création d'une instance
-#### Création manuelle d'une instance.
+#### Création manuelle d'une instance hébergeant un serveur web.
 
 Dans cette partie, nous allons déployer une instance composée d'une image ubuntu 22.04 sur une VM standard A1 FLex.
 
@@ -482,7 +482,7 @@ Maintenant que nous connaissons les étapes pour créer un serveur web basé sur
 
 Au vu de l'étape précedente, nous savons de quoi nous avons besoin pour créer notre machine via terraform.
 
-Commencons par créer un [VCN](https://registry.terraform.io/providers/oracle/oci/latest/docs/resources/core_vcn)
+Créons un fichier network.tf avec le contenu suivant:
 
 ```
 resource "oci_core_vcn" "vcn" {
@@ -491,47 +491,262 @@ resource "oci_core_vcn" "vcn" {
   display_name = "vcn-${var.hostname}"
   dns_label = "vcn${var.hostname}"
 }
+
+resource "oci_core_internet_gateway" "internet_gateway" {
+  compartment_id = var.compartment_ocid
+  display_name = "ig-${var.hostname}"
+  vcn_id = oci_core_vcn.vcn.id
+}
+
+resource "oci_core_default_route_table" "default_route_table" {
+  manage_default_resource_id = oci_core_vcn.vcn.default_route_table_id
+  display_name = "rt-${var.hostname}"
+
+  route_rules {
+    destination = "0.0.0.0/0"
+    destination_type = "CIDR_BLOCK"
+    network_entity_id = oci_core_internet_gateway.internet_gateway.id
+  }
+}
+
+resource "oci_core_network_security_group" "nsg" {
+  compartment_id = var.compartment_ocid
+  vcn_id = oci_core_vcn.vcn.id
+  display_name = "nsg-${var.hostname}"
+}
+
+resource "oci_core_network_security_group_security_rule" "nsg_outbound" {
+  network_security_group_id = "${oci_core_network_security_group.nsg.id}"
+  direction = "EGRESS"
+  protocol = "all"
+  description = "nsg-${var.hostname}-outbound"
+  destination = "0.0.0.0/0"
+  destination_type = "CIDR_BLOCK"
+}
+
+resource "oci_core_subnet" "subnet" {
+  cidr_block        = "10.1.0.0/24"
+  display_name      = "subnet-${var.hostname}"
+  dns_label = "subnet${var.hostname}"
+  compartment_id    = var.compartment_ocid
+  vcn_id = oci_core_vcn.vcn.id
+  route_table_id = oci_core_vcn.vcn.default_route_table_id
+  dhcp_options_id = oci_core_vcn.vcn.default_dhcp_options_id
+  security_list_ids = [oci_core_security_list.sl.id]
+
+  provisioner "local-exec" {
+    command = "sleep 5"
+  }
+}
+
+resource "oci_core_security_list" "sl" {
+  compartment_id = var.compartment_ocid
+  display_name   = "seclist-${var.hostname}"
+  vcn_id         = oci_core_vcn.vcn.id
+
+  egress_security_rules {
+    destination = "0.0.0.0/0"
+    protocol    = "6"
+  }
+
+  ingress_security_rules {
+
+    protocol = "6"
+    source   = "0.0.0.0/0"
+
+    tcp_options {
+      max = 22
+      min = 22
+    }
+  }
+
+  ingress_security_rules {
+    protocol = "6"
+    source   = "0.0.0.0/0"
+
+    tcp_options {
+      max = 80
+      min = 80
+    }
+  }
+}
+
 ```
 
-On stockera les variables dans le fichier variables.tf
+On a aussi un fichier variables.tf avec le contenu suivant :
 
 ```
 variable "compartment_ocid" {
   # OCID of your OCI Account compartment
-  default = "xxxxxx"
+  default = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3moz6nw2o6d74a6xxlft7yxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 }
 
 variable "hostname" {
-  default = "xxxxxx"
+  default = "srvweb"
 }
 ```
 
-Voici ce que nous avons actuellement suite à la création via l'interface
+Faisons un 
 
-![oci](/img/oci27.png)
+```
+terraform plan
+```
 
-Et voici le résultat de la commande
+Pour nous assurer que tout est OK
 
-```bash
-terraform apply
+```
+terraform plan
 
 Terraform used the selected providers to generate the following execution plan. Resource actions are indicated with the following symbols:
   + create
 
 Terraform will perform the following actions:
 
+  # oci_core_default_route_table.default_route_table will be created
+  + resource "oci_core_default_route_table" "default_route_table" {
+      + compartment_id             = (known after apply)
+      + defined_tags               = (known after apply)
+      + display_name               = "rt-srvweb"
+      + freeform_tags              = (known after apply)
+      + id                         = (known after apply)
+      + manage_default_resource_id = (known after apply)
+      + state                      = (known after apply)
+      + time_created               = (known after apply)
+
+      + route_rules {
+          + cidr_block        = (known after apply)
+          + description       = (known after apply)
+          + destination       = "0.0.0.0/0"
+          + destination_type  = "CIDR_BLOCK"
+          + network_entity_id = (known after apply)
+          + route_type        = (known after apply)
+        }
+    }
+
+  # oci_core_internet_gateway.internet_gateway will be created
+  + resource "oci_core_internet_gateway" "internet_gateway" {
+      + compartment_id = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3moz6nw2o6d74a6xxlft7yxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      + defined_tags   = (known after apply)
+      + display_name   = "ig-srvweb"
+      + enabled        = true
+      + freeform_tags  = (known after apply)
+      + id             = (known after apply)
+      + route_table_id = (known after apply)
+      + state          = (known after apply)
+      + time_created   = (known after apply)
+      + vcn_id         = (known after apply)
+    }
+
+  # oci_core_network_security_group.nsg will be created
+  + resource "oci_core_network_security_group" "nsg" {
+      + compartment_id = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3moz6nw2o6d74a6xxlft7yxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      + defined_tags   = (known after apply)
+      + display_name   = "nsg-srvweb"
+      + freeform_tags  = (known after apply)
+      + id             = (known after apply)
+      + state          = (known after apply)
+      + time_created   = (known after apply)
+      + vcn_id         = (known after apply)
+    }
+
+  # oci_core_network_security_group_security_rule.nsg_outbound will be created
+  + resource "oci_core_network_security_group_security_rule" "nsg_outbound" {
+      + description               = "nsg-srvweb-outbound"
+      + destination               = "0.0.0.0/0"
+      + destination_type          = "CIDR_BLOCK"
+      + direction                 = "EGRESS"
+      + id                        = (known after apply)
+      + is_valid                  = (known after apply)
+      + network_security_group_id = (known after apply)
+      + protocol                  = "all"
+      + source_type               = (known after apply)
+      + stateless                 = (known after apply)
+      + time_created              = (known after apply)
+    }
+
+  # oci_core_security_list.sl will be created
+  + resource "oci_core_security_list" "sl" {
+      + compartment_id = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3moz6nw2o6d74a6xxlft7yxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      + defined_tags   = (known after apply)
+      + display_name   = "seclist-srvweb"
+      + freeform_tags  = (known after apply)
+      + id             = (known after apply)
+      + state          = (known after apply)
+      + time_created   = (known after apply)
+      + vcn_id         = (known after apply)
+
+      + egress_security_rules {
+          + description      = (known after apply)
+          + destination      = "0.0.0.0/0"
+          + destination_type = (known after apply)
+          + protocol         = "6"
+          + stateless        = (known after apply)
+        }
+
+      + ingress_security_rules {
+          + description = (known after apply)
+          + protocol    = "6"
+          + source      = "0.0.0.0/0"
+          + source_type = (known after apply)
+          + stateless   = false
+
+          + tcp_options {
+              + max = 22
+              + min = 22
+            }
+        }
+      + ingress_security_rules {
+          + description = (known after apply)
+          + protocol    = "6"
+          + source      = "0.0.0.0/0"
+          + source_type = (known after apply)
+          + stateless   = false
+
+          + tcp_options {
+              + max = 80
+              + min = 80
+            }
+        }
+    }
+
+  # oci_core_subnet.subnet will be created
+  + resource "oci_core_subnet" "subnet" {
+      + availability_domain        = (known after apply)
+      + cidr_block                 = "10.1.0.0/24"
+      + compartment_id             = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3moz6nw2o6d74a6xxlft7yxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      + defined_tags               = (known after apply)
+      + dhcp_options_id            = (known after apply)
+      + display_name               = "subnet-srvweb"
+      + dns_label                  = "subnetsrvweb"
+      + freeform_tags              = (known after apply)
+      + id                         = (known after apply)
+      + ipv6cidr_block             = (known after apply)
+      + ipv6cidr_blocks            = (known after apply)
+      + ipv6virtual_router_ip      = (known after apply)
+      + prohibit_internet_ingress  = (known after apply)
+      + prohibit_public_ip_on_vnic = (known after apply)
+      + route_table_id             = (known after apply)
+      + security_list_ids          = (known after apply)
+      + state                      = (known after apply)
+      + subnet_domain_name         = (known after apply)
+      + time_created               = (known after apply)
+      + vcn_id                     = (known after apply)
+      + virtual_router_ip          = (known after apply)
+      + virtual_router_mac         = (known after apply)
+    }
+
   # oci_core_vcn.vcn will be created
   + resource "oci_core_vcn" "vcn" {
       + byoipv6cidr_blocks               = (known after apply)
       + cidr_block                       = "10.1.0.0/16"
       + cidr_blocks                      = (known after apply)
-      + compartment_id                   = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3mozxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx4qya"
+      + compartment_id                   = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3moz6nw2o6d74a6xxlft7yxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
       + default_dhcp_options_id          = (known after apply)
       + default_route_table_id           = (known after apply)
       + default_security_list_id         = (known after apply)
       + defined_tags                     = (known after apply)
-      + display_name                     = "vcn-kube"
-      + dns_label                        = "vcnkube"
+      + display_name                     = "vcn-srvweb"
+      + dns_label                        = "vcnsrvweb"
       + freeform_tags                    = (known after apply)
       + id                               = (known after apply)
       + ipv6cidr_blocks                  = (known after apply)
@@ -548,78 +763,125 @@ Terraform will perform the following actions:
         }
     }
 
-Plan: 1 to add, 0 to change, 0 to destroy.
-
-Do you want to perform these actions?
-  Terraform will perform the actions described above.
-  Only 'yes' will be accepted to approve.
-
-  Enter a value: yes
-
-oci_core_vcn.vcn: Creating...
-oci_core_vcn.vcn: Creation complete after 2s [id=ocid1.vcn.oc1.eu-paris-1.amaaaaaa5nytwhqa62exmbafamzgcdqhf6uuoqogygcdatdttxnm6azufidq]
-
-Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+Plan: 7 to add, 0 to change, 0 to destroy.
 ```
-Ce qui nous donne au niveau de l'interface
+
+on peut donc faire un :
+
+```
+terraform apply
+```
+
+Si on se connecte à l'interface, on retrouve notre Virtual Cloud Network
+
+![oci](/img/oci27.png)
+
+Si on clique dessus, on a:
 
 ![oci](/img/oci28.png)
 
-Paramtétrage des accés sortants
+On retrouve les mêmes paramètres que pour notre VCN créé manuellement.
 
-Nous avons besoin d'une passerelle internet et d'une table de routage pour les accès externes.
-
-```
-resource "oci_core_internet_gateway" "internet_gateway" {
-  compartment_id = var.compartment_ocid
-  display_name = "ig-${var.hostname}"
-  vcn_id = oci_core_vcn.vcn.id
-}
-```
+Nous allons poursuivre avec la création de notre compute instance, nous créons alors un fichier intitulé compute.tf et le remplissons avec le contenu suivant:
 
 ```
-resource "oci_core_default_route_table" "default_route_table" {
-  manage_default_resource_id = oci_core_vcn.vcn.default_route_table_id
-  display_name = "rt-${var.hostname}"
+resource "oci_core_instance" "compute_instance" {
+  availability_domain = var.availablity_domain_name == "" ? data.oci_identity_availability_domains.ads.availability_domains[0]["name"] : var.availablity_domain_name
+  compartment_id      = var.compartment_ocid
+  display_name        = "${var.hostname}"
+  shape               = var.instance_shape
+  fault_domain        = "FAULT-DOMAIN-1"
 
-  route_rules {
-    destination = "0.0.0.0/0"
-    destination_type = "CIDR_BLOCK"
-    network_entity_id = oci_core_internet_gateway.internet_gateway.id
+  shape_config {
+    ocpus         = var.instance_ocpus
+    memory_in_gbs = var.instance_shape_config_memory_in_gbs
+  }
+
+   metadata = {
+        ssh_authorized_keys = file("/home/richard/.ssh/oci.pub")
+    } 
+
+  create_vnic_details {
+    subnet_id                 = oci_core_subnet.subnet.id
+    display_name              = "vnic-${var.hostname}"
+    assign_public_ip          = true
+    assign_private_dns_record = true
+  }
+
+  source_details {
+    source_type             = "image"
+    source_id               = "ocid1.image.oc1.eu-paris-1.aaaaaaaa2kukypyttuyb6vkpjbdrzl5dm2cg7mxniigjdukbfvelwlesrurq"
+    boot_volume_size_in_gbs = "50"
+  }
+
+  timeouts {
+    create = "60m"
   }
 }
 ```
 
-Ensuite, nous créons un Network Security Group.
+On crée dans la foulée un fichier datasources.tf avec le contenu suivant :
 
 ```
-resource "oci_core_network_security_group" "nsg" {
-  compartment_id = var.compartment_ocid
-  vcn_id = oci_core_vcn.vcn.id
-  display_name = "nsg-${var.hostname}"
+data "oci_identity_availability_domains" "ads" {
+  compartment_id = var.tenancy_ocid
 }
 ```
 
-Nous allons autoriser tous les accès sortants
+ainsi qu'un fichier terraform.tfvars
 
 ```
-resource "oci_core_network_security_group_security_rule" "nsg_outbound" {
-  network_security_group_id = "${oci_core_network_security_group.nsg.id}"
-  direction = "EGRESS"
-  protocol = "all"
-  description = "nsg-${var.hostname}-outbound"
-  destination = "0.0.0.0/0"
-  destination_type = "CIDR_BLOCK"
+# Authentication
+tenancy_ocid         = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3moz6nw2o6d74a6xxlft7yxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# Region
+region = "eu-paris-1"
+
+# Compartment
+compartment_ocid = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3moz6nw2o6d74a6xxlft7yxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+```
+
+Et on modifie le fichier variables.tf
+
+```
+variable "region" {}
+
+variable "compartment_ocid" {
+}
+
+variable "tenancy_ocid" {
+}
+
+variable "availablity_domain_name" {
+  default = ""
+}
+
+variable "hostname" {
+  default = "srvweb"
+}
+
+variable "instance_shape" {
+  description = "Instance Shape"
+  default     = "VM.Standard.A1.Flex"
+}
+
+variable "instance_ocpus" {
+  default = 1
+}
+
+variable "instance_shape_config_memory_in_gbs" {
+  default = 6
 }
 ```
-
-Si nous faisons un terraform plan à ce stade, il nous dit:
+On vérifie que tout est ok avec un :
 
 ```
-$ terraform plan
-oci_core_vcn.vcn: Refreshing state... [id=ocid1.vcn.oc1.eu-paris-1.amaaaaaa5nytwhqa62exmbafamzgcdqhf6uuoqogygcdatdttxnm6azufidq]
+terraform plan
+data.oci_identity_availability_domains.ads: Reading...
+data.oci_identity_availability_domains.ads: Read complete after 0s [id=IdentityAvailabilityDomainsDataSource-367745787]
 
-Terraform used the selected providers to generate the following execution plan. Resource actions are indicated with the following symbols:
+Terraform used the selected providers to generate the following execution plan. Resource
+actions are indicated with the following symbols:
   + create
 
 Terraform will perform the following actions:
@@ -628,10 +890,10 @@ Terraform will perform the following actions:
   + resource "oci_core_default_route_table" "default_route_table" {
       + compartment_id             = (known after apply)
       + defined_tags               = (known after apply)
-      + display_name               = "rt-kube"
+      + display_name               = "rt-srvweb"
       + freeform_tags              = (known after apply)
       + id                         = (known after apply)
-      + manage_default_resource_id = "ocid1.routetable.oc1.eu-paris-1.aaaaaaaatk4wewk3gfz2voan577y2sl7a46jf5v7y4f7gwqfxrhcshnqdyma"
+      + manage_default_resource_id = (known after apply)
       + state                      = (known after apply)
       + time_created               = (known after apply)
 
@@ -645,35 +907,157 @@ Terraform will perform the following actions:
         }
     }
 
+  # oci_core_instance.compute_instance will be created
+  + resource "oci_core_instance" "compute_instance" {
+      + availability_domain                 = "Tgrg:EU-PARIS-1-AD-1"
+      + boot_volume_id                      = (known after apply)
+      + capacity_reservation_id             = (known after apply)
+      + compartment_id                      = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3moz6nw2o6d74a6xxlft7yxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      + dedicated_vm_host_id                = (known after apply)
+      + defined_tags                        = (known after apply)
+      + display_name                        = "srvweb"
+      + fault_domain                        = "FAULT-DOMAIN-1"
+      + freeform_tags                       = (known after apply)
+      + hostname_label                      = (known after apply)
+      + id                                  = (known after apply)
+      + image                               = (known after apply)
+      + ipxe_script                         = (known after apply)
+      + is_pv_encryption_in_transit_enabled = (known after apply)
+      + launch_mode                         = (known after apply)
+      + metadata                            = {
+          + "ssh_authorized_keys" = <<-EOT
+                ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCXdARPOIcfkmBwhhCDV+YXiG7P97sUWK30ceYCgFobM5A1G/GWJIeEINj57ylfRiWvLzwsVIDC6zd9XW6HHhj4etgOFyi4mxSNHlSWtoj/w6Gj877R7+psuwtVprpQcOFzkbdzn/xnMRovdhyuHx7+BSMQXEnGlwuFECv/REn4VzLbyEOnj5u15U35Xkv1VJoUDX2Eq9OhM4Lo4+o/Nnia49IrwRMfOtSgwILzx/q+DkucM498Wx7TGacNMy2NDD7IbX9zp4nJfr29EkGKq018NQ2gVlt7Tkv1OPdRexH0eJNJUm2MlLLC0a9OM84+2I4U0JrBsd0xSso+ofDNeZTg/aKXia0o3qahwkUEbOlxHfg6namhNm9SqrNQS3qa6CHluQKoSl+ykOYZv+OYPmu32tcKL2yTf0KSFDgyBJb05Cox3YYpOZrq+H6HW6o2OQjGFzXPjxWXojCmGBSyXNquAmhpzFiJ7jlYhOPE9UItx57Vxpr1etxSx0392OodzWM= richard@mint
+            EOT
+        }
+      + private_ip                          = (known after apply)
+      + public_ip                           = (known after apply)
+      + region                              = (known after apply)
+      + shape                               = "VM.Standard.A1.Flex"
+      + state                               = (known after apply)
+      + subnet_id                           = (known after apply)
+      + system_tags                         = (known after apply)
+      + time_created                        = (known after apply)
+      + time_maintenance_reboot_due         = (known after apply)
+
+      + agent_config {
+          + are_all_plugins_disabled = (known after apply)
+          + is_management_disabled   = (known after apply)
+          + is_monitoring_disabled   = (known after apply)
+
+          + plugins_config {
+              + desired_state = (known after apply)
+              + name          = (known after apply)
+            }
+        }
+
+      + availability_config {
+          + is_live_migration_preferred = (known after apply)
+          + recovery_action             = (known after apply)
+        }
+
+      + create_vnic_details {
+          + assign_private_dns_record = true
+          + assign_public_ip          = "true"
+          + defined_tags              = (known after apply)
+          + display_name              = "srvweb"
+          + freeform_tags             = (known after apply)
+          + hostname_label            = (known after apply)
+          + private_ip                = (known after apply)
+          + skip_source_dest_check    = (known after apply)
+          + subnet_id                 = (known after apply)
+          + vlan_id                   = (known after apply)
+        }
+
+      + instance_options {
+          + are_legacy_imds_endpoints_disabled = (known after apply)
+        }
+
+      + launch_options {
+          + boot_volume_type                    = (known after apply)
+          + firmware                            = (known after apply)
+          + is_consistent_volume_naming_enabled = (known after apply)
+          + is_pv_encryption_in_transit_enabled = (known after apply)
+          + network_type                        = (known after apply)
+          + remote_data_volume_type             = (known after apply)
+        }
+
+      + platform_config {
+          + are_virtual_instructions_enabled               = (known after apply)
+          + is_access_control_service_enabled              = (known after apply)
+          + is_input_output_memory_management_unit_enabled = (known after apply)
+          + is_measured_boot_enabled                       = (known after apply)
+          + is_secure_boot_enabled                         = (known after apply)
+          + is_symmetric_multi_threading_enabled           = (known after apply)
+          + is_trusted_platform_module_enabled             = (known after apply)
+          + numa_nodes_per_socket                          = (known after apply)
+          + percentage_of_cores_enabled                    = (known after apply)
+          + type                                           = (known after apply)
+        }
+
+      + preemptible_instance_config {
+          + preemption_action {
+              + preserve_boot_volume = (known after apply)
+              + type                 = (known after apply)
+            }
+        }
+
+      + shape_config {
+          + baseline_ocpu_utilization     = (known after apply)
+          + gpu_description               = (known after apply)
+          + gpus                          = (known after apply)
+          + local_disk_description        = (known after apply)
+          + local_disks                   = (known after apply)
+          + local_disks_total_size_in_gbs = (known after apply)
+          + max_vnic_attachments          = (known after apply)
+          + memory_in_gbs                 = 6
+          + networking_bandwidth_in_gbps  = (known after apply)
+          + nvmes                         = (known after apply)
+          + ocpus                         = 1
+          + processor_description         = (known after apply)
+        }
+
+      + source_details {
+          + boot_volume_size_in_gbs = "50"
+          + boot_volume_vpus_per_gb = (known after apply)
+          + kms_key_id              = (known after apply)
+          + source_id               = "ocid1.image.oc1.eu-paris-1.aaaaaaaa2kukypyttuyb6vkpjbdrzl5dm2cg7mxniigjdukbfvelwlesrurq"
+          + source_type             = "image"
+        }
+
+      + timeouts {
+          + create = "60m"
+        }
+    }
+
   # oci_core_internet_gateway.internet_gateway will be created
   + resource "oci_core_internet_gateway" "internet_gateway" {
-      + compartment_id = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3moz6nw2o6d74a6xxlft7yjsjav47jx4l4ic2fc2b4qya"
+      + compartment_id = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3moz6nw2o6d74a6xxlft7yxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
       + defined_tags   = (known after apply)
-      + display_name   = "ig-kube"
+      + display_name   = "ig-srvweb"
       + enabled        = true
       + freeform_tags  = (known after apply)
       + id             = (known after apply)
       + route_table_id = (known after apply)
       + state          = (known after apply)
       + time_created   = (known after apply)
-      + vcn_id         = "ocid1.vcn.oc1.eu-paris-1.amaaaaaa5nytwhqa62exmbafamzgcdqhf6uuoqogygcdatdttxnm6azufidq"
+      + vcn_id         = (known after apply)
     }
 
   # oci_core_network_security_group.nsg will be created
   + resource "oci_core_network_security_group" "nsg" {
-      + compartment_id = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3moz6nw2o6d74a6xxlft7yjsjav47jx4l4ic2fc2b4qya"
+      + compartment_id = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3moz6nw2o6d74a6xxlft7yxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
       + defined_tags   = (known after apply)
-      + display_name   = "nsg-kube"
+      + display_name   = "nsg-srvweb"
       + freeform_tags  = (known after apply)
       + id             = (known after apply)
       + state          = (known after apply)
       + time_created   = (known after apply)
-      + vcn_id         = "ocid1.vcn.oc1.eu-paris-1.amaaaaaa5nytwhqa62exmbafamzgcdqhf6uuoqogygcdatdttxnm6azufidq"
+      + vcn_id         = (known after apply)
     }
 
   # oci_core_network_security_group_security_rule.nsg_outbound will be created
   + resource "oci_core_network_security_group_security_rule" "nsg_outbound" {
-      + description               = "nsg-kube-outbound"
+      + description               = "nsg-srvweb-outbound"
       + destination               = "0.0.0.0/0"
       + destination_type          = "CIDR_BLOCK"
       + direction                 = "EGRESS"
@@ -686,90 +1070,481 @@ Terraform will perform the following actions:
       + time_created              = (known after apply)
     }
 
-Plan: 4 to add, 0 to change, 0 to destroy.
+  # oci_core_security_list.sl will be created
+  + resource "oci_core_security_list" "sl" {
+      + compartment_id = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3moz6nw2o6d74a6xxlft7yxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      + defined_tags   = (known after apply)
+      + display_name   = "seclist-srvweb"
+      + freeform_tags  = (known after apply)
+      + id             = (known after apply)
+      + state          = (known after apply)
+      + time_created   = (known after apply)
+      + vcn_id         = (known after apply)
+
+      + egress_security_rules {
+          + description      = (known after apply)
+          + destination      = "0.0.0.0/0"
+          + destination_type = (known after apply)
+          + protocol         = "6"
+          + stateless        = (known after apply)
+        }
+
+      + ingress_security_rules {
+          + description = (known after apply)
+          + protocol    = "6"
+          + source      = "0.0.0.0/0"
+          + source_type = (known after apply)
+          + stateless   = false
+
+          + tcp_options {
+              + max = 22
+              + min = 22
+            }
+        }
+      + ingress_security_rules {
+          + description = (known after apply)
+          + protocol    = "6"
+          + source      = "0.0.0.0/0"
+          + source_type = (known after apply)
+          + stateless   = false
+
+          + tcp_options {
+              + max = 80
+              + min = 80
+            }
+        }
+    }
+
+  # oci_core_subnet.subnet will be created
+  + resource "oci_core_subnet" "subnet" {
+      + availability_domain        = (known after apply)
+      + cidr_block                 = "10.1.0.0/24"
+      + compartment_id             = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3moz6nw2o6d74a6xxlft7yxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      + defined_tags               = (known after apply)
+      + dhcp_options_id            = (known after apply)
+      + display_name               = "subnet-srvweb"
+      + dns_label                  = "subnetsrvweb"
+      + freeform_tags              = (known after apply)
+      + id                         = (known after apply)
+      + ipv6cidr_block             = (known after apply)
+      + ipv6cidr_blocks            = (known after apply)
+      + ipv6virtual_router_ip      = (known after apply)
+      + prohibit_internet_ingress  = (known after apply)
+      + prohibit_public_ip_on_vnic = (known after apply)
+      + route_table_id             = (known after apply)
+      + security_list_ids          = (known after apply)
+      + state                      = (known after apply)
+      + subnet_domain_name         = (known after apply)
+      + time_created               = (known after apply)
+      + vcn_id                     = (known after apply)
+      + virtual_router_ip          = (known after apply)
+      + virtual_router_mac         = (known after apply)
+    }
+
+  # oci_core_vcn.vcn will be created
+  + resource "oci_core_vcn" "vcn" {
+      + byoipv6cidr_blocks               = (known after apply)
+      + cidr_block                       = "10.1.0.0/16"
+      + cidr_blocks                      = (known after apply)
+      + compartment_id                   = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3moz6nw2o6d74a6xxlft7yxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      + default_dhcp_options_id          = (known after apply)
+      + default_route_table_id           = (known after apply)
+      + default_security_list_id         = (known after apply)
+      + defined_tags                     = (known after apply)
+      + display_name                     = "vcn-srvweb"
+      + dns_label                        = "vcnsrvweb"
+      + freeform_tags                    = (known after apply)
+      + id                               = (known after apply)
+      + ipv6cidr_blocks                  = (known after apply)
+      + ipv6private_cidr_blocks          = (known after apply)
+      + is_ipv6enabled                   = (known after apply)
+      + is_oracle_gua_allocation_enabled = (known after apply)
+      + state                            = (known after apply)
+      + time_created                     = (known after apply)
+      + vcn_domain_name                  = (known after apply)
+
+      + byoipv6cidr_details {
+          + byoipv6range_id = (known after apply)
+          + ipv6cidr_block  = (known after apply)
+        }
+    }
+
+Plan: 8 to add, 0 to change, 0 to destroy.
+
+───────────────────────────────────────────────────────────────────────────────────────────────
+
+Note: You didn't use the -out option to save this plan, so Terraform can't guarantee to take
+exactly these actions if you run "terraform apply" now.
+```
+Tout va bien, on fait un :
+
+```
+$ terraform apply
+data.oci_identity_availability_domains.ads: Reading...
+data.oci_identity_availability_domains.ads: Read complete after 0s [id=IdentityAvailabilityDomainsDataSource-367745787]
+
+Terraform used the selected providers to generate the following execution plan. Resource
+actions are indicated with the following symbols:
+  + create
+
+Terraform will perform the following actions:
+
+  # oci_core_default_route_table.default_route_table will be created
+  + resource "oci_core_default_route_table" "default_route_table" {
+      + compartment_id             = (known after apply)
+      + defined_tags               = (known after apply)
+      + display_name               = "rt-srvweb"
+      + freeform_tags              = (known after apply)
+      + id                         = (known after apply)
+      + manage_default_resource_id = (known after apply)
+      + state                      = (known after apply)
+      + time_created               = (known after apply)
+
+      + route_rules {
+          + cidr_block        = (known after apply)
+          + description       = (known after apply)
+          + destination       = "0.0.0.0/0"
+          + destination_type  = "CIDR_BLOCK"
+          + network_entity_id = (known after apply)
+          + route_type        = (known after apply)
+        }
+    }
+
+  # oci_core_instance.compute_instance will be created
+  + resource "oci_core_instance" "compute_instance" {
+      + availability_domain                 = "Tgrg:EU-PARIS-1-AD-1"
+      + boot_volume_id                      = (known after apply)
+      + capacity_reservation_id             = (known after apply)
+      + compartment_id                      = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3moz6nw2o6d74a6xxlft7yxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      + dedicated_vm_host_id                = (known after apply)
+      + defined_tags                        = (known after apply)
+      + display_name                        = "srvweb"
+      + fault_domain                        = "FAULT-DOMAIN-1"
+      + freeform_tags                       = (known after apply)
+      + hostname_label                      = (known after apply)
+      + id                                  = (known after apply)
+      + image                               = (known after apply)
+      + ipxe_script                         = (known after apply)
+      + is_pv_encryption_in_transit_enabled = (known after apply)
+      + launch_mode                         = (known after apply)
+      + metadata                            = {
+          + "ssh_authorized_keys" = <<-EOT
+                ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCXdARPOIcfkmBwhhCDV+YXiG7P97sUWK30ceYCgFobM5A1G/GWJIeEINj57ylfRiWvLzwsVIDC6zd9XW6HHhj4etgOFyi4mxSNHlSWtoj/w6Gj877R7+psuwtVprpQcOFzkbdzn/xnMRovdhyuHx7+BSMQXEnGlwuFECv/REn4VzLbyEOnj5u15U35Xkv1VJoUDX2Eq9OhM4Lo4+o/Nnia49IrwRMfOtSgwILzx/q+DkucM498Wx7TGacNMy2NDD7IbX9zp4nJfr29EkGKq018NQ2gVlt7Tkv1OPdRexH0eJNJUm2MlLLC0a9OM84+2I4U0JrBsd0xSso+ofDNeZTg/aKXia0o3qahwkUEbOlxHfg6namhNm9SqrNQS3qa6CHluQKoSl+ykOYZv+OYPmu32tcKL2yTf0KSFDgyBJb05Cox3YYpOZrq+H6HW6o2OQjGFzXPjxWXojCmGBSyXNquAmhpzFiJ7jlYhOPE9UItx57Vxpr1etxSx0392OodzWM= richard@mint
+            EOT
+        }
+      + private_ip                          = (known after apply)
+      + public_ip                           = (known after apply)
+      + region                              = (known after apply)
+      + shape                               = "VM.Standard.A1.Flex"
+      + state                               = (known after apply)
+      + subnet_id                           = (known after apply)
+      + system_tags                         = (known after apply)
+      + time_created                        = (known after apply)
+      + time_maintenance_reboot_due         = (known after apply)
+
+      + agent_config {
+          + are_all_plugins_disabled = (known after apply)
+          + is_management_disabled   = (known after apply)
+          + is_monitoring_disabled   = (known after apply)
+
+          + plugins_config {
+              + desired_state = (known after apply)
+              + name          = (known after apply)
+            }
+        }
+
+      + availability_config {
+          + is_live_migration_preferred = (known after apply)
+          + recovery_action             = (known after apply)
+        }
+
+      + create_vnic_details {
+          + assign_private_dns_record = true
+          + assign_public_ip          = "true"
+          + defined_tags              = (known after apply)
+          + display_name              = "srvweb"
+          + freeform_tags             = (known after apply)
+          + hostname_label            = (known after apply)
+          + private_ip                = (known after apply)
+          + skip_source_dest_check    = (known after apply)
+          + subnet_id                 = (known after apply)
+          + vlan_id                   = (known after apply)
+        }
+
+      + instance_options {
+          + are_legacy_imds_endpoints_disabled = (known after apply)
+        }
+
+      + launch_options {
+          + boot_volume_type                    = (known after apply)
+          + firmware                            = (known after apply)
+          + is_consistent_volume_naming_enabled = (known after apply)
+          + is_pv_encryption_in_transit_enabled = (known after apply)
+          + network_type                        = (known after apply)
+          + remote_data_volume_type             = (known after apply)
+        }
+
+      + platform_config {
+          + are_virtual_instructions_enabled               = (known after apply)
+          + is_access_control_service_enabled              = (known after apply)
+          + is_input_output_memory_management_unit_enabled = (known after apply)
+          + is_measured_boot_enabled                       = (known after apply)
+          + is_secure_boot_enabled                         = (known after apply)
+          + is_symmetric_multi_threading_enabled           = (known after apply)
+          + is_trusted_platform_module_enabled             = (known after apply)
+          + numa_nodes_per_socket                          = (known after apply)
+          + percentage_of_cores_enabled                    = (known after apply)
+          + type                                           = (known after apply)
+        }
+
+      + preemptible_instance_config {
+          + preemption_action {
+              + preserve_boot_volume = (known after apply)
+              + type                 = (known after apply)
+            }
+        }
+
+      + shape_config {
+          + baseline_ocpu_utilization     = (known after apply)
+          + gpu_description               = (known after apply)
+          + gpus                          = (known after apply)
+          + local_disk_description        = (known after apply)
+          + local_disks                   = (known after apply)
+          + local_disks_total_size_in_gbs = (known after apply)
+          + max_vnic_attachments          = (known after apply)
+          + memory_in_gbs                 = 6
+          + networking_bandwidth_in_gbps  = (known after apply)
+          + nvmes                         = (known after apply)
+          + ocpus                         = 1
+          + processor_description         = (known after apply)
+        }
+
+      + source_details {
+          + boot_volume_size_in_gbs = "50"
+          + boot_volume_vpus_per_gb = (known after apply)
+          + kms_key_id              = (known after apply)
+          + source_id               = "ocid1.image.oc1.eu-paris-1.aaaaaaaa2kukypyttuyb6vkpjbdrzl5dm2cg7mxniigjdukbfvelwlesrurq"
+          + source_type             = "image"
+        }
+
+      + timeouts {
+          + create = "60m"
+        }
+    }
+
+  # oci_core_internet_gateway.internet_gateway will be created
+  + resource "oci_core_internet_gateway" "internet_gateway" {
+      + compartment_id = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3moz6nw2o6d74a6xxlft7yxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      + defined_tags   = (known after apply)
+      + display_name   = "ig-srvweb"
+      + enabled        = true
+      + freeform_tags  = (known after apply)
+      + id             = (known after apply)
+      + route_table_id = (known after apply)
+      + state          = (known after apply)
+      + time_created   = (known after apply)
+      + vcn_id         = (known after apply)
+    }
+
+  # oci_core_network_security_group.nsg will be created
+  + resource "oci_core_network_security_group" "nsg" {
+      + compartment_id = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3moz6nw2o6d74a6xxlft7yxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      + defined_tags   = (known after apply)
+      + display_name   = "nsg-srvweb"
+      + freeform_tags  = (known after apply)
+      + id             = (known after apply)
+      + state          = (known after apply)
+      + time_created   = (known after apply)
+      + vcn_id         = (known after apply)
+    }
+
+  # oci_core_network_security_group_security_rule.nsg_outbound will be created
+  + resource "oci_core_network_security_group_security_rule" "nsg_outbound" {
+      + description               = "nsg-srvweb-outbound"
+      + destination               = "0.0.0.0/0"
+      + destination_type          = "CIDR_BLOCK"
+      + direction                 = "EGRESS"
+      + id                        = (known after apply)
+      + is_valid                  = (known after apply)
+      + network_security_group_id = (known after apply)
+      + protocol                  = "all"
+      + source_type               = (known after apply)
+      + stateless                 = (known after apply)
+      + time_created              = (known after apply)
+    }
+
+  # oci_core_security_list.sl will be created
+  + resource "oci_core_security_list" "sl" {
+      + compartment_id = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3moz6nw2o6d74a6xxlft7yxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      + defined_tags   = (known after apply)
+      + display_name   = "seclist-srvweb"
+      + freeform_tags  = (known after apply)
+      + id             = (known after apply)
+      + state          = (known after apply)
+      + time_created   = (known after apply)
+      + vcn_id         = (known after apply)
+
+      + egress_security_rules {
+          + description      = (known after apply)
+          + destination      = "0.0.0.0/0"
+          + destination_type = (known after apply)
+          + protocol         = "6"
+          + stateless        = (known after apply)
+        }
+
+      + ingress_security_rules {
+          + description = (known after apply)
+          + protocol    = "6"
+          + source      = "0.0.0.0/0"
+          + source_type = (known after apply)
+          + stateless   = false
+
+          + tcp_options {
+              + max = 22
+              + min = 22
+            }
+        }
+      + ingress_security_rules {
+          + description = (known after apply)
+          + protocol    = "6"
+          + source      = "0.0.0.0/0"
+          + source_type = (known after apply)
+          + stateless   = false
+
+          + tcp_options {
+              + max = 80
+              + min = 80
+            }
+        }
+    }
+
+  # oci_core_subnet.subnet will be created
+  + resource "oci_core_subnet" "subnet" {
+      + availability_domain        = (known after apply)
+      + cidr_block                 = "10.1.0.0/24"
+      + compartment_id             = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3moz6nw2o6d74a6xxlft7yxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      + defined_tags               = (known after apply)
+      + dhcp_options_id            = (known after apply)
+      + display_name               = "subnet-srvweb"
+      + dns_label                  = "subnetsrvweb"
+      + freeform_tags              = (known after apply)
+      + id                         = (known after apply)
+      + ipv6cidr_block             = (known after apply)
+      + ipv6cidr_blocks            = (known after apply)
+      + ipv6virtual_router_ip      = (known after apply)
+      + prohibit_internet_ingress  = (known after apply)
+      + prohibit_public_ip_on_vnic = (known after apply)
+      + route_table_id             = (known after apply)
+      + security_list_ids          = (known after apply)
+      + state                      = (known after apply)
+      + subnet_domain_name         = (known after apply)
+      + time_created               = (known after apply)
+      + vcn_id                     = (known after apply)
+      + virtual_router_ip          = (known after apply)
+      + virtual_router_mac         = (known after apply)
+    }
+
+  # oci_core_vcn.vcn will be created
+  + resource "oci_core_vcn" "vcn" {
+      + byoipv6cidr_blocks               = (known after apply)
+      + cidr_block                       = "10.1.0.0/16"
+      + cidr_blocks                      = (known after apply)
+      + compartment_id                   = "ocid1.tenancy.oc1..aaaaaaaaujdjzgc3moz6nw2o6d74a6xxlft7yxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      + default_dhcp_options_id          = (known after apply)
+      + default_route_table_id           = (known after apply)
+      + default_security_list_id         = (known after apply)
+      + defined_tags                     = (known after apply)
+      + display_name                     = "vcn-srvweb"
+      + dns_label                        = "vcnsrvweb"
+      + freeform_tags                    = (known after apply)
+      + id                               = (known after apply)
+      + ipv6cidr_blocks                  = (known after apply)
+      + ipv6private_cidr_blocks          = (known after apply)
+      + is_ipv6enabled                   = (known after apply)
+      + is_oracle_gua_allocation_enabled = (known after apply)
+      + state                            = (known after apply)
+      + time_created                     = (known after apply)
+      + vcn_domain_name                  = (known after apply)
+
+      + byoipv6cidr_details {
+          + byoipv6range_id = (known after apply)
+          + ipv6cidr_block  = (known after apply)
+        }
+    }
+
+Plan: 8 to add, 0 to change, 0 to destroy.
+
+Do you want to perform these actions?
+  Terraform will perform the actions described above.
+  Only 'yes' will be accepted to approve.
+
+  Enter a value: yes
+
+oci_core_vcn.vcn: Creating...
+oci_core_vcn.vcn: Creation complete after 1s [id=ocid1.vcn.oc1.eu-paris-1.amaaaaaa5nytwhqa3gysivvqkywxkkbjw6bogmhxtzfiifooygdayidwhtyq]
+oci_core_internet_gateway.internet_gateway: Creating...
+oci_core_network_security_group.nsg: Creating...
+oci_core_security_list.sl: Creating...
+oci_core_security_list.sl: Creation complete after 0s [id=ocid1.securitylist.oc1.eu-paris-1.aaaaaaaarwlkmlo7hsbrlgtazpfsfej6fdltqhyacxnets7yuctd77vkbrfa]
+oci_core_subnet.subnet: Creating...
+oci_core_network_security_group.nsg: Creation complete after 0s [id=ocid1.networksecuritygroup.oc1.eu-paris-1.aaaaaaaaxblbyvb62zswggqwdwputgduuhli524jex5qr3yiu5ho3wxvucbq]
+oci_core_network_security_group_security_rule.nsg_outbound: Creating...
+oci_core_network_security_group_security_rule.nsg_outbound: Creation complete after 0s [id=26BA23]
+oci_core_internet_gateway.internet_gateway: Creation complete after 0s [id=ocid1.internetgateway.oc1.eu-paris-1.aaaaaaaazok5ftokl2ouyqcukcc4nnzz7h7lyd3y3cyxnctwf6ajwaxld4ba]
+oci_core_default_route_table.default_route_table: Creating...
+oci_core_default_route_table.default_route_table: Creation complete after 1s [id=ocid1.routetable.oc1.eu-paris-1.aaaaaaaaotzsmay6gvdjp7jler7d3tcys65adkoaeo2cf2c3nv6mer67zavq]
+oci_core_subnet.subnet: Provisioning with 'local-exec'...
+oci_core_subnet.subnet (local-exec): Executing: ["/bin/sh" "-c" "sleep 5"]
+oci_core_subnet.subnet: Creation complete after 9s [id=ocid1.subnet.oc1.eu-paris-1.aaaaaaaaverpsr73wqcjpqpisoxjxl76epuo22uvcumdnh3hkqdbc4o7xyla]
+oci_core_instance.compute_instance: Creating...
+oci_core_instance.compute_instance: Still creating... [10s elapsed]
+oci_core_instance.compute_instance: Still creating... [20s elapsed]
+oci_core_instance.compute_instance: Still creating... [30s elapsed]
+oci_core_instance.compute_instance: Still creating... [40s elapsed]
+oci_core_instance.compute_instance: Still creating... [50s elapsed]
+oci_core_instance.compute_instance: Still creating... [1m0s elapsed]
+oci_core_instance.compute_instance: Still creating... [1m10s elapsed]
+oci_core_instance.compute_instance: Still creating... [1m20s elapsed]
+oci_core_instance.compute_instance: Still creating... [1m30s elapsed]
+oci_core_instance.compute_instance: Still creating... [1m40s elapsed]
+oci_core_instance.compute_instance: Still creating... [1m50s elapsed]
+oci_core_instance.compute_instance: Still creating... [2m0s elapsed]
+oci_core_instance.compute_instance: Still creating... [2m10s elapsed]
+oci_core_instance.compute_instance: Still creating... [2m20s elapsed]
+oci_core_instance.compute_instance: Still creating... [2m30s elapsed]
+oci_core_instance.compute_instance: Still creating... [2m40s elapsed]
+oci_core_instance.compute_instance: Creation complete after 2m46s [id=ocid1.instance.oc1.eu-paris-1.anrwiljr5nytwhqc7vd7glgxkin4wtmh32igvea2jo7soaejfbb2otnz24va]
+
+Apply complete! Resources: 8 added, 0 changed, 0 destroyed.
 ```
 
-On retrouve nos infos dans l'interface
+Si on se connecte à l'interface d'OCI, on voit bien notre compute instance:
+
+![oci](/img/oci29.png)
+
+On peut se connecter en ssh à notre machine
 
 ![oci](/img/oci30.png)
 
+Avant de finaliser l'automatisation, nous allons installer manuellement le serveur apache et ouvrir le port 80 sur notre instance
+
+```bash
+sudo apt-get update
+sudo apt-get install apache2
+sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
+sudo netfilter-persistent save
+```
+
+Et on s'assure que c'est bon en tapant notre ip publique dans un navigateur:
+
 ![oci](/img/oci31.png)
 
-![oci](/img/oci32.png)
-
-Poursuivons en créant un sous-réseau.
-
-```
-resource "oci_core_subnet" "subnet" {
-  availability_domain = data.oci_identity_availability_domain.ad.name
-  cidr_block = "10.1.0.0/24"
-  display_name = "subnet-${var.hostname}"
-  dns_label = "subnet${var.hostname}"
-  security_list_ids = [
-    oci_core_security_list.empty_security_list.id]
-  compartment_id = var.compartment_ocid
-  vcn_id = oci_core_vcn.vcn.id
-  route_table_id = oci_core_vcn.vcn.default_route_table_id
-  dhcp_options_id = oci_core_vcn.vcn.default_dhcp_options_id
-}
-```
-
- Et une security list qui sera vide par défaut.
-
-```
-# create empty security list to avoid using 'default' with open 22
-resource "oci_core_security_list" "empty_security_list" {
-  compartment_id = var.compartment_ocid
-  vcn_id = oci_core_vcn.vcn.id
-  display_name = "seclist-${var.hostname}"
-}
-```
-
-Nous configurons ensuite les accès entrants
 
 
-On autorise le ssh
 
-```
-resource "oci_core_network_security_group_security_rule" "nsg_inbound_ssh" {
-  network_security_group_id = "${oci_core_network_security_group.nsg.id}"
-  direction = "INGRESS"
-  protocol = "6" # TCP
-  description = "nsg-${var.hostname}-inbound-ssh"
-  source = "${data.dns_a_record_set.bastion-host.addrs[0]}/32"
-  source_type = "CIDR_BLOCK"
-  destination = "${module.vminst.public_ip}/32"
-  destination_type = "CIDR_BLOCK"
-  tcp_options {
-    destination_port_range {
-      min = 22
-      max = 22
-    }
-  }
-}
-```
 
-et le http
 
-```
-resource "oci_core_network_security_group_security_rule" "nsg_inbound_http" {
-  network_security_group_id = "${oci_core_network_security_group.nsg.id}"
-  direction = "INGRESS"
-  protocol = "6" # TCP
-  description = "nsg-${var.hostname}-inbound-http"
-  source = "${data.dns_a_record_set.bastion-host.addrs[0]}/32"
-  source_type = "CIDR_BLOCK"
-  destination = "${module.vminst.public_ip}/32"
-  destination_type = "CIDR_BLOCK"
-  tcp_options {
-    destination_port_range {
-      min = 80
-      max = 80
-    }
-  }
-}
-```
 
-<!---
-https://www.lightenna.com/tech/2020/create-oracle-cloud-vm-using-terraform/
--->
+
+
+
