@@ -1539,9 +1539,27 @@ Et on s'assure que c'est bon en tapant notre ip publique dans un navigateur:
 
 ![oci](/img/oci31.png)
 
+Nous allons automatiser la dernière partie, nous allons créer un dossier cloud-init et nous allons y créer un fichier vm-cloud-config avec le contenu suivant:
 
+```
+#cloud-config
+runcmd:
+-   sudo apt-get update
+-   sudo apt-get install apache2 -y
+-   sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
+-   sudo netfilter-persistent save
+```
 
+Et nous allons rajouter la ligne suivante dans le bloc metadata du fichier compute.tf
 
+```
+   metadata = {
+        ssh_authorized_keys = file("/home/richard/.ssh/oci.pub")
+        user_data = base64encode(file("./cloud-init/vm.cloud-config"))
+    } 
+```
+
+Si nous refaisons un terraform apply, le serveur web est bien accessible via l'IP publique.
 
 
 
