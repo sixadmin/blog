@@ -1561,6 +1561,10 @@ Et nous allons rajouter la ligne suivante dans le bloc metadata du fichier compu
 
 Si nous refaisons un terraform apply, le serveur web est bien accessible via l'IP publique.
 
+Vous pouvez retrouver le code source [ici](https://github.com/sixadmin/oci-free-tier-compute-webserver)
+
+
+
 
 
 
