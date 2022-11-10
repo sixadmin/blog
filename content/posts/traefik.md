@@ -278,5 +278,9 @@ sudo apt install apache2-utils
 **TIPS**
 Quand vous générez le mot de passe via htpasswd, lorsque vous le renseignez dans le fichier docker-compose.yaml, tous les symboles $ doivent être échappés avec un autre $.
 
+Dans la ligne suivante, on crée un middleware myAccess dans lequel on défnit une liste d'IP autorisées pour accéder à nos services.
+
+Les 4 dernières lignes permettent de faire la redirection https.
+
 
 
