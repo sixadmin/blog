@@ -47,7 +47,7 @@ networks:
     external: true
 ```
 
-Pour que traefk demande à letsencrypt de générer un certificat https, on déclare des labels dans notre docker-compose ou on lui spécifie les entrypoints, le nom du domaine de notre registry, le port qui expose le service, l'option tls à true pour le certificat et le nom de notre resolver (Un article sur traefik est en cours de préparation).
+Pour que traefk demande à letsencrypt de générer un certificat https, on déclare des labels dans notre docker-compose ou on lui spécifie les entrypoints, le nom du domaine de notre registry, le port qui expose le service, l'option tls à true pour le certificat et le nom de notre resolver (Un article sur traefik est disponible [ici](https://blog.6adm.in/posts/traefik/)).
 
 ### L'authentification
 
