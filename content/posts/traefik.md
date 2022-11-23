@@ -1,6 +1,6 @@
 ---
 title: "Traefik"
-summary: Traefik
+summary: Voici traefik un reverse proxy très performant.
 date: 2022-11-09T01:24:42+02:00
 draft: false
 cover:
@@ -59,7 +59,7 @@ services:
       - "traefik.http.routers.http-catchall.rule=hostregexp(`{host:.+}`)"
       - "traefik.http.routers.http-catchall.entrypoints=web"
       - "traefik.http.routers.http-catchall.middlewares=redirect-to-https"
-      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=websecure"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
 
       - "traefik.http.routers.nas.entrypoints=websecure"
       - "traefik.http.routers.nas.rule=Host(`nas.mydomain.com`)"
