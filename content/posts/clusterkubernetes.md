@@ -12,6 +12,7 @@ ShowToc: true
 
 # Le matériel
 
+
 - 1 Raspberry Pi 4 Model B 4Gb
 - 5 Raspberry Pi 4 Model B 2Gb
 - 1 Anker PowerPort 10 Chargeur 60W 10 Ports USB
@@ -196,9 +197,14 @@ k3s-node1   Ready    <none>                 8m13s   v1.25.3+k3s1
 k3s-node5   Ready    <none>                 2m6s    v1.25.3+k3s1
 k3s-node2   Ready    <none>                 6m1s    v1.25.3+k3s1
 ```
-
+```bash
 docker build -t dashboard .
+```
 
+```bash
 docker tag dashboard registry.cruz.im/dashboard:v1.1.0
+```
 
+```bash
 docker push registry.cruz.im/dashboard:v1.1.0
+```
