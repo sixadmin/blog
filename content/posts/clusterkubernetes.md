@@ -197,6 +197,9 @@ k3s-node1   Ready    <none>                 8m13s   v1.25.3+k3s1
 k3s-node5   Ready    <none>                 2m6s    v1.25.3+k3s1
 k3s-node2   Ready    <none>                 6m1s    v1.25.3+k3s1
 ```
+
+Création des images à pousser sur le registry docker
+
 ```bash
 docker build -t dashboard .
 ```
