@@ -211,3 +211,5 @@ docker tag dashboard registry.cruz.im/dashboard:v1.1.0
 ```bash
 docker push registry.cruz.im/dashboard:v1.1.0
 ```
+
+A SUIVRE
